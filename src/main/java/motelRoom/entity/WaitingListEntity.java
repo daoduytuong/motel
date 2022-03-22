@@ -8,6 +8,7 @@ import java.util.UUID;
 
 @Entity
 @Data
+@Table(name = "waiting_list")
 public class WaitingListEntity {
     @Id
     @GeneratedValue(generator = "uuid2", strategy = GenerationType.IDENTITY)
