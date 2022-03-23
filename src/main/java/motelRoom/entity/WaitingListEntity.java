@@ -16,7 +16,8 @@ public class WaitingListEntity {
     @Column(columnDefinition = "VARCHAR(40)")
     @Type(type = "uuid-char")
     private UUID waiting_list_id;
-
-    private String user_id;
-    private String room_id;
+    @Type(type = "uuid-char")
+    private UUID user_id;
+    @Type(type = "uuid-char")
+    private UUID room_id;
 }

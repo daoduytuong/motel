@@ -1,6 +1,8 @@
 package motelRoom.service.waitingListService;
 
+import motelRoom.dto.waitingList.WaitingListCreateDto;
 import motelRoom.dto.waitingList.WaitingListDetailDto;
+import motelRoom.entity.WaitingListEntity;
 import motelRoom.mapper.WaitingListMapper;
 import motelRoom.repository.WaitingListRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,11 +22,6 @@ public class WaitingListServiceImpl implements WaitingListService{
         this.repository = repository;
         this.mapper = mapper;
     }
-//
-//    @Override
-//    public List<WaitingListEntity> getAllWaitingList() {
-//        return repository.findAll();
-//    }
 
     @Override
     public List<WaitingListDetailDto> getAllWaitingList()
@@ -32,9 +29,6 @@ public class WaitingListServiceImpl implements WaitingListService{
         return mapper.fromEntitiesToDto(repository.findAll());
     }
 
-//    public List<CommodityDetailDto> findAll() {
-  //      return commodityMapper.fromEntityToDto(commodityRepository.findAll());
-   // }
     @Override
     public WaitingListDetailDto getById(UUID id)
     {
@@ -42,6 +36,15 @@ public class WaitingListServiceImpl implements WaitingListService{
         return dto;
     }
 
+    @Override
+    public WaitingListDetailDto addWaitingList(WaitingListCreateDto waitingListCreateDto)
+    {
+        WaitingListEntity waitingListEntity = mapper.fromDtoCreateEntity(waitingListCreateDto);
+        WaitingListEntity waitingListEntity2 = repository.save(waitingListEntity);
+
+        WaitingListDetailDto waitingListDetailDto = mapper.fromEntityToDetailDto(waitingListEntity2);
+        return waitingListDetailDto;
+    }
 
 
 }
