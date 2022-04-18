@@ -1,41 +1,39 @@
 package motelRoom.service.userService;
 
-import motelRoom.dto.user.UserCreateDto;
+import freemarker.template.Configuration;
+import freemarker.template.TemplateException;
 import motelRoom.dto.user.UserDetailDto;
 import motelRoom.entity.UserEntity;
 import motelRoom.mapper.UserMapper;
 import motelRoom.repository.UserRepository;
+import motelRoom.service.exceptionService.BadRequestException;
+import motelRoom.service.exceptionService.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-
+import org.apache.commons.validator.routines.EmailValidator;
 import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
 @Service
 public class UserServiceImpl implements UserService{
+    private static final String CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+    @Autowired
+    Configuration configuration; //config for freemarker
     @Autowired
     UserRepository userRepository;
     @Autowired
     JavaMailSender javaMailSender;
     @Autowired
     UserMapper userMapper;
-    /**
-     * Create 1 User
-     */
-    @Override
-    public UserDetailDto createUser(UserCreateDto userCreateDto) {
-        UserEntity userEntity = userMapper.fromUserEntityCreateDtoToEntity(userCreateDto);
-        UserEntity createdUser = userRepository.save(userEntity);
-        UserDetailDto userDetailDto =null;
-        if (createdUser != null) {
-            userDetailDto = userMapper.fromUserEntityToUserCrateDto(createdUser);
-        }
-        return userDetailDto;
-    }
 
     /**
      * get 1 User by id
@@ -44,49 +42,76 @@ public class UserServiceImpl implements UserService{
     public UserDetailDto findById(UUID id) {
         return userMapper.fromUserEntityToUserCrateDto(userRepository.getById(id));
     }
+
     /**
      * Forgot Password
-     * send new password to username(email)
+     * send random new password to username(email)
      */
     @Override
     public String forgotPassword(String username) {
-        UserEntity entity = userRepository.findByUsername(username);
+        if(!isValidEmail(username)) {
+            throw new BadRequestException("Email address is not valid");
+        };
+        UserEntity entity = userRepository.findByUsername(username); //tìm user trong DB bằng username
         if (entity == null)
         {
-            return null;
+            throw new NotFoundException("Not find user");
         }
         String newPassword = generateNewPassword(); //generate new password
         entity.setPassword(newPassword); //set new password
         userRepository.saveAndFlush(entity);
         try {
-            sendMail(username,newPassword); //send mail to email(username)
-        } catch (MessagingException e) {
+            sendmail(entity, newPassword);
+        } catch (MessagingException | TemplateException | IOException e) {
             e.printStackTrace();
         }
         return entity.getUsername();
     }
+
     /**
-     * generate new password
+     * validator email
+     * @param email
+     * @return
+     */
+    public static boolean isValidEmail(String email) {
+        EmailValidator validator = EmailValidator.getInstance();
+        return validator.isValid(email);
+    }
+
+    /**
+     * generate random new password
      */
     String generateNewPassword()
     {
-        String chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%&";
         Random rnd = new Random();
         StringBuilder sb = new StringBuilder(8);
         for (int i = 0; i < 8; i++)
-            sb.append(chars.charAt(rnd.nextInt(chars.length())));
+            sb.append(CHARS.charAt(rnd.nextInt(CHARS.length())));
         return sb.toString();
     }
+
     /**
      * send mail new password for user(email)
      */
-    void sendMail(String mail,String password) throws MessagingException {
-        MimeMessage mailMessage = javaMailSender.createMimeMessage();
-        MimeMessageHelper messageHelper = new MimeMessageHelper(mailMessage, true); //multipart true
-        messageHelper.setTo(mail); //set mailto
-        messageHelper.setSubject("Your new password");
-        messageHelper.setText("Hi <b>" + mail +"</b>" +
-                                "\nYour new password <p style=\"color:DeepSkyBlue\"><b>" + password + "</b></p>", true);
-        javaMailSender.send(mailMessage);
+    public void sendmail(UserEntity entity, String password) throws MessagingException, TemplateException, IOException {
+        MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage);
+        helper.setSubject("Your new password");
+        helper.setTo(entity.getUsername()); //username is email
+        String content = getEmailContent(entity.getFullName(),password); //
+        helper.setText(content, true); //allow send HTML
+        javaMailSender.send(mimeMessage);
+    }
+
+    /**
+     * convert template and variable to string
+     */
+    String getEmailContent(String fullName,String password) throws IOException, TemplateException {
+        StringWriter stringWriter = new StringWriter();
+        Map<String, String> model = new HashMap<>(); //transmission data to template HTML
+        model.put("fullName", fullName);
+        model.put("password",password);
+        configuration.getTemplate("templateForgotPassword.ftlh").process(model,stringWriter);
+        return stringWriter.getBuffer().toString();
     }
 }
